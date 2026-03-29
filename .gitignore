@@ -1,0 +1,23 @@
+# env files
+.env
+.env.local
+.env.*.local
+
+# deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# build output
+dist/
+.next/
+out/
+typechain-types/
+artifacts/
+cache/
+
+# misc
+.DS_Store
+*.log
