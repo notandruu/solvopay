@@ -1,0 +1,42 @@
+---
+title: Overview
+description: Contract architecture and deployed addresses.
+---
+
+SolvoPay's on-chain layer is three contracts: a library, a per-session escrow, and a factory that deploys escrows.
+
+## Contracts
+
+| Contract | Purpose |
+|----------|---------|
+| `VoucherLib` | EIP-712 typed data hashing for the `Voucher` struct |
+| `SessionEscrow` | Holds deposits, verifies vouchers, settles payments |
+| `SessionFactory` | Deploys escrows, supplies USDC to Aave on session open |
+
+## Deployed addresses (Base mainnet)
+
+| Contract | Address |
+|----------|---------|
+| SessionFactory | `TBD — deploy in progress` |
+| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Aave V3 Pool | `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5` |
+| aUSDC | `0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB` |
+
+## Dependencies
+
+- OpenZeppelin v5: `EIP712`, `ECDSA`, `ReentrancyGuard`, `SafeERC20`
+- Aave V3: `IPool` (supply, withdraw)
+- Solidity 0.8.24, EVM version cancun
+
+## Security properties
+
+- **No admin keys**: contracts are immutable after deployment. There is no owner, no pause, no upgrade.
+- **No reentrancy**: `ReentrancyGuard` on `settle` and `refund`.
+- **Signature binding**: each escrow is the EIP-712 `verifyingContract`. Vouchers from one session cannot be replayed on another.
+- **Nonce enforcement**: `settle` only accepts nonces strictly greater than `highestNonce`. The first submitted voucher is final.
+- **Deposit cap**: `totalAuthorized` must be `<= deposit`. The contract can never pay out more than was locked.
+- **Agent recovery**: `refund()` is always callable after `deadlineAt + 7 days` regardless of backend availability.
+
+## Source
+
+[github.com/notandruu/solvopay](https://github.com/notandruu/solvopay) — `contracts/contracts/`

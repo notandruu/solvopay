@@ -1,0 +1,72 @@
+---
+title: openSession
+description: Lock USDC into escrow and start earning yield.
+---
+
+## Signature
+
+```typescript
+client.openSession(params: OpenSessionParams): Promise<Session>
+```
+
+## Parameters
+
+```typescript
+interface OpenSessionParams {
+  serviceProvider: `0x${string}`  // recipient address
+  depositAmount: bigint           // USDC amount in 6-decimal units
+  agentYieldShare: number         // 0–100, percent of yield returned to agent
+  deadlineAt: bigint              // Unix timestamp — session must settle by this time
+}
+```
+
+## Return value
+
+```typescript
+interface Session {
+  sessionId: `0x${string}`  // bytes32 identifier, keccak256 of (agent, recipient, nonce)
+  escrow: `0x${string}`     // deployed SessionEscrow address
+  tx: `0x${string}`         // transaction hash of the openSession call
+}
+```
+
+## Example
+
+```typescript
+import { parseUnits } from 'viem'
+
+const session = await client.openSession({
+  serviceProvider: '0xServiceProviderAddress',
+  depositAmount: parseUnits('10', 6),  // 10 USDC
+  agentYieldShare: 80,
+  deadlineAt: BigInt(Math.floor(Date.now() / 1000) + 3600),  // 1 hour
+})
+
+console.log(session.sessionId)  // 0x...
+console.log(session.escrow)     // 0x...
+```
+
+## What happens on-chain
+
+1. The SDK calls `USDC.approve(factory, depositAmount)` on your behalf
+2. Calls `SessionFactory.openSession(...)` — factory pulls the USDC
+3. Factory deploys a `SessionEscrow` contract
+4. Factory calls `aavePool.supply(usdc, depositAmount, escrowAddress, 0)` — aTokens land directly in the escrow
+5. `SessionOpened` event is emitted; the SDK parses it to return `sessionId` and `escrow`
+
+aUSDC starts rebasing immediately after this transaction confirms.
+
+## Yield share
+
+`agentYieldShare` is stored in the escrow and applied at settlement:
+
+```
+agentYield     = yield × agentYieldShare / 100
+providerYield  = yield × (100 − agentYieldShare) / 100
+```
+
+A value of `80` means the agent earns 80% of yield, the service provider earns 20%.
+
+## Deadline
+
+The `deadlineAt` timestamp is a soft deadline — the session can be settled any time before it. After it passes, no new settlement is allowed. 7 days after the deadline, the agent can call `refund()` directly if the session was never settled.

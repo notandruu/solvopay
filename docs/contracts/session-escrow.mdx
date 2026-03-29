@@ -1,0 +1,98 @@
+---
+title: SessionEscrow
+description: Holds deposits, verifies vouchers, and distributes funds at settlement.
+---
+
+## Overview
+
+Each session gets its own `SessionEscrow` instance deployed by the factory. The escrow holds aUSDC (rebasing), verifies EIP-712 voucher signatures on settlement, and distributes USDC to the agent and service provider.
+
+## Immutables
+
+```solidity
+bytes32 public immutable sessionId;
+address public immutable agent;
+address public immutable recipient;
+uint256 public immutable deposit;
+uint8   public immutable agentYieldShare;   // 0–100
+uint256 public immutable deadlineAt;
+address public immutable aavePool;
+address public immutable usdc;
+address public immutable aUsdc;
+```
+
+All values are set at construction and cannot change.
+
+## State
+
+```solidity
+enum Status { ACTIVE, SETTLED, REFUNDED }
+Status public status;
+uint256 public highestNonce;
+```
+
+## Functions
+
+### settle
+
+```solidity
+function settle(
+    VoucherLib.Voucher calldata voucher,
+    bytes calldata sig
+) external nonReentrant
+```
+
+Only callable by `recipient`. Verifies:
+- `status == ACTIVE`
+- `block.timestamp <= deadlineAt`
+- EIP-712 signature recovers to `agent`
+- `voucher.nonce > highestNonce`
+- `voucher.totalAuthorized <= deposit`
+
+On success:
+1. Sets `highestNonce = voucher.nonce`, `status = SETTLED`
+2. Withdraws all aUSDC from Aave: `aavePool.withdraw(usdc, type(uint256).max, address(this))`
+3. Computes yield: `yield = totalWithdrawn - deposit`
+4. Transfers `totalAuthorized + providerYield` to `recipient`
+5. Transfers remaining USDC to `agent`
+
+**Emits:**
+
+```solidity
+event Settled(uint256 recipientAmount, uint256 agentRefund, uint256 yieldEarned);
+```
+
+### refund
+
+```solidity
+function refund() external nonReentrant
+```
+
+Only callable by `agent`, only after `block.timestamp >= deadlineAt + 7 days`, only if `status == ACTIVE`.
+
+Withdraws all aUSDC from Aave and transfers everything to `agent`.
+
+**Emits:**
+
+```solidity
+event Refunded(uint256 agentRefund);
+```
+
+## EIP-712 domain
+
+The escrow inherits `EIP712("SolvoPay", "1")`. The `verifyingContract` in the domain is the escrow's own address. This means a voucher signed for one session cannot be replayed against any other escrow.
+
+## Aave withdrawal
+
+The escrow calls `aavePool.withdraw(usdc, type(uint256).max, address(this))` to redeem all aUSDC. Passing `type(uint256).max` redeems the full aToken balance including any yield accrued since session open. If Aave's withdraw reverts (e.g., reserve paused), the session stays `ACTIVE` and settlement can be retried.
+
+## Settlement math
+
+```
+yield          = totalWithdrawn − deposit
+providerYield  = yield × (100 − agentYieldShare) / 100
+agentYield     = yield × agentYieldShare / 100
+
+recipientAmount = totalAuthorized + providerYield
+agentAmount     = (deposit − totalAuthorized) + agentYield
+```

@@ -1,0 +1,86 @@
+---
+title: signVoucher
+description: Sign an off-chain payment authorization.
+---
+
+## Signature
+
+```typescript
+client.signVoucher(
+  params: VoucherParams,
+  escrowAddress: `0x${string}`
+): Promise<SignedVoucher>
+```
+
+## Parameters
+
+```typescript
+interface VoucherParams {
+  sessionId: `0x${string}`   // from openSession
+  totalAuthorized: bigint    // cumulative USDC authorized so far (6 decimals)
+  nonce: bigint              // must be strictly greater than the previous nonce
+}
+```
+
+`escrowAddress` is the verifying contract for EIP-712 domain binding. Use the `escrow` returned by `openSession`.
+
+## Return value
+
+```typescript
+interface SignedVoucher {
+  sessionId: `0x${string}`
+  totalAuthorized: bigint
+  nonce: bigint
+  signature: `0x${string}`  // 65-byte ECDSA signature over EIP-712 typed data
+}
+```
+
+## Example
+
+```typescript
+import { parseUnits } from 'viem'
+
+// First action: authorize $0.001
+const v1 = await client.signVoucher(
+  { sessionId: session.sessionId, totalAuthorized: parseUnits('0.001', 6), nonce: 1n },
+  session.escrow
+)
+
+// Second action: cumulative total is now $0.003
+const v2 = await client.signVoucher(
+  { sessionId: session.sessionId, totalAuthorized: parseUnits('0.003', 6), nonce: 2n },
+  session.escrow
+)
+```
+
+Send each voucher to the service provider off-chain:
+
+```typescript
+await fetch('https://api.yourservice.com/voucher', {
+  method: 'POST',
+  body: JSON.stringify(v2),
+  headers: { 'Content-Type': 'application/json' },
+})
+```
+
+## Vouchers are cumulative
+
+`totalAuthorized` is not per-action — it is the running total. The contract enforces that the submitted voucher's `totalAuthorized` does not exceed the deposit, and its `nonce` is greater than any previously seen nonce.
+
+This means:
+- The provider can only extract up to the agent's last signed amount
+- Intermediate vouchers are superseded by the final one
+- Only the final voucher needs to be submitted on-chain
+
+## EIP-712 domain
+
+Each escrow is its own verifying contract:
+
+```
+name:              "SolvoPay"
+version:           "1"
+chainId:           8453
+verifyingContract: <escrow address>
+```
+
+Vouchers signed for one session cannot be replayed on another, even if the same agent and provider are involved.

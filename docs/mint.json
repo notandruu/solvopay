@@ -1,0 +1,81 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "SolvoPay",
+  "logo": {
+    "dark": "/images/logo-dark.svg",
+    "light": "/images/logo-light.svg"
+  },
+  "favicon": "/images/favicon.png",
+  "colors": {
+    "primary": "#a1a1aa",
+    "light": "#e4e4e7",
+    "dark": "#18181b",
+    "background": {
+      "dark": "#09090b",
+      "light": "#ffffff"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "solvopay.xyz",
+      "url": "https://solvopay.xyz"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://solvopay.xyz/dashboard"
+  },
+  "tabs": [
+    {
+      "name": "SDK",
+      "url": "sdk"
+    },
+    {
+      "name": "Contracts",
+      "url": "contracts"
+    },
+    {
+      "name": "API",
+      "url": "api"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": ["introduction", "quickstart", "how-it-works"]
+    },
+    {
+      "group": "SDK",
+      "pages": [
+        "sdk/installation",
+        "sdk/open-session",
+        "sdk/sign-voucher",
+        "sdk/close-session"
+      ]
+    },
+    {
+      "group": "Contracts",
+      "pages": [
+        "contracts/overview",
+        "contracts/session-factory",
+        "contracts/session-escrow",
+        "contracts/voucher-lib"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api/overview",
+        "api/sessions",
+        "api/vouchers",
+        "api/webhooks"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/notandruu/solvopay"
+  },
+  "modeToggle": {
+    "default": "dark"
+  }
+}

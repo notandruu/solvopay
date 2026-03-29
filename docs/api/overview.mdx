@@ -1,0 +1,53 @@
+---
+title: Overview
+description: Backend REST API for session state and settlement.
+---
+
+## Base URL
+
+```
+https://your-backend.railway.app
+```
+
+Set this as `backendUrl` in the SDK client config.
+
+## Authentication
+
+No authentication is required for session reads. Settlement endpoints (`POST /sessions/{id}/settle`) are intended to be called by the SDK or service providers — they rely on the on-chain signature for security rather than API auth.
+
+Webhook endpoints verify Alchemy HMAC signatures and reject invalid requests.
+
+## Data formats
+
+- All request and response bodies are JSON
+- USDC amounts are strings representing `uint256` values in 6-decimal units (e.g., `"10000000"` = $10)
+- Addresses are lowercase hex strings with `0x` prefix
+- Session IDs are 32-byte hex strings with `0x` prefix
+
+## Errors
+
+```json
+{
+  "detail": "session not found"
+}
+```
+
+Standard HTTP status codes: `400` for bad input, `404` for missing resources, `422` for validation errors, `500` for backend/chain errors.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/sessions` | Register a new session |
+| `GET` | `/sessions/{id}` | Get session state |
+| `POST` | `/sessions/{id}/vouchers` | Submit a voucher |
+| `POST` | `/sessions/{id}/settle` | Trigger on-chain settlement |
+| `POST` | `/webhooks/alchemy` | Alchemy event webhook |
+
+## Self-hosting
+
+The backend is a FastAPI app. See `backend/` in the GitHub repo. Requires:
+- Postgres database (`DATABASE_URL`)
+- Alchemy API key (`ALCHEMY_API_KEY`) for RPC + webhooks
+- Backend EOA private key (`BACKEND_EOA_PRIVATE_KEY`) for signing settlement transactions
+- Factory contract address (`FACTORY_ADDRESS`)

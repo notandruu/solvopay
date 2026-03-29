@@ -1,0 +1,64 @@
+---
+title: SessionFactory
+description: Deploys escrows and bootstraps Aave positions.
+---
+
+## Overview
+
+`SessionFactory` is the entry point for agents. It deploys one `SessionEscrow` per session, transfers USDC to Aave on behalf of the escrow, and records the mapping from `sessionId` to escrow address.
+
+## State
+
+```solidity
+mapping(bytes32 => address) public sessions;
+```
+
+Look up any escrow address by session ID.
+
+## Functions
+
+### openSession
+
+```solidity
+function openSession(
+    address recipient,
+    uint256 depositAmount,
+    uint8 agentYieldShare,
+    uint256 deadlineAt
+) external returns (bytes32 sessionId, address escrow)
+```
+
+**Steps:**
+1. Pulls `depositAmount` USDC from `msg.sender` via `safeTransferFrom`
+2. Computes `sessionId = keccak256(abi.encodePacked(msg.sender, recipient, nonce))`
+3. Deploys `new SessionEscrow(sessionId, msg.sender, recipient, depositAmount, agentYieldShare, deadlineAt, aavePool, usdc, aUsdc)`
+4. Approves `aavePool` to spend `depositAmount` USDC
+5. Calls `aavePool.supply(usdc, depositAmount, escrowAddress, 0)` — aTokens go directly to the escrow
+6. Stores `sessions[sessionId] = escrowAddress`
+7. Emits `SessionOpened`
+
+The agent must approve the factory to spend USDC before calling this (the SDK handles this automatically).
+
+**Emits:**
+
+```solidity
+event SessionOpened(
+    bytes32 indexed sessionId,
+    address indexed escrow,
+    address indexed agent,
+    address recipient,
+    uint256 deposit
+);
+```
+
+## Constructor parameters
+
+```solidity
+constructor(address _aavePool, address _usdc, address _aUsdc)
+```
+
+On Base mainnet these are hardcoded to the Aave V3 pool, USDC, and aUSDC addresses.
+
+## Why the factory supplies to Aave
+
+Aave's `supply` takes an `onBehalfOf` parameter — the address that receives aTokens. By calling `aavePool.supply(usdc, amount, escrowAddress, 0)`, the factory causes aTokens to be credited directly to the escrow without requiring an intermediate transfer step. The escrow receives aUSDC from block one.

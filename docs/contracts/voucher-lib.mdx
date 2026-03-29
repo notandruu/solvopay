@@ -1,0 +1,79 @@
+---
+title: VoucherLib
+description: EIP-712 typed data library for the Voucher struct.
+---
+
+## Overview
+
+`VoucherLib` is a Solidity library that defines the `Voucher` struct and computes its EIP-712 struct hash. It is used by `SessionEscrow` to verify voucher signatures.
+
+## Voucher struct
+
+```solidity
+struct Voucher {
+    bytes32 sessionId;
+    uint256 totalAuthorized;  // cumulative USDC authorized, 6 decimals
+    uint256 nonce;            // must increase monotonically
+}
+```
+
+## Type hash
+
+```solidity
+bytes32 internal constant VOUCHER_TYPEHASH =
+    keccak256("Voucher(bytes32 sessionId,uint256 totalAuthorized,uint256 nonce)");
+```
+
+## hash function
+
+```solidity
+function hash(Voucher memory voucher) internal pure returns (bytes32) {
+    return keccak256(abi.encode(
+        VOUCHER_TYPEHASH,
+        voucher.sessionId,
+        voucher.totalAuthorized,
+        voucher.nonce
+    ));
+}
+```
+
+Returns the EIP-712 struct hash. `SessionEscrow` passes this to `_hashTypedDataV4(...)` (from OpenZeppelin `EIP712`) to produce the final digest that is compared against the recovered signer.
+
+## Full verification flow
+
+```solidity
+// In SessionEscrow.settle:
+bytes32 digest = _hashTypedDataV4(VoucherLib.hash(voucher));
+address signer = ECDSA.recover(digest, sig);
+require(signer == agent, "bad sig");
+```
+
+`_hashTypedDataV4` prepends the EIP-712 domain separator, which includes the escrow's own address as `verifyingContract`. This binds the signature to a specific session.
+
+## Off-chain equivalent (viem)
+
+```typescript
+const signature = await walletClient.signTypedData({
+  domain: {
+    name: 'SolvoPay',
+    version: '1',
+    chainId: 8453,
+    verifyingContract: escrowAddress,
+  },
+  types: {
+    Voucher: [
+      { name: 'sessionId', type: 'bytes32' },
+      { name: 'totalAuthorized', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'Voucher',
+  message: {
+    sessionId,
+    totalAuthorized,
+    nonce,
+  },
+})
+```
+
+This produces the same digest as the on-chain `_hashTypedDataV4(VoucherLib.hash(voucher))`.

@@ -1,0 +1,83 @@
+---
+title: Quickstart
+description: Open your first payment session in under 5 minutes.
+---
+
+## Install the SDK
+
+```bash
+npm install @solvopay/sdk viem
+```
+
+## Initialize the client
+
+```typescript
+import { SolvoPayClient } from '@solvopay/sdk'
+import { parseUnits } from 'viem'
+
+const client = new SolvoPayClient({
+  rpcUrl: process.env.BASE_RPC_URL,
+  agentPrivateKey: process.env.AGENT_PRIVATE_KEY,
+  factoryAddress: process.env.FACTORY_ADDRESS,
+  backendUrl: 'https://your-backend.railway.app', // optional
+})
+```
+
+## Open a session
+
+Deposit 10 USDC, give the agent 80% of yield, deadline in 1 hour:
+
+```typescript
+const session = await client.openSession({
+  serviceProvider: '0xServiceProviderAddress',
+  depositAmount: parseUnits('10', 6),
+  agentYieldShare: 80,
+  deadlineAt: BigInt(Math.floor(Date.now() / 1000) + 3600),
+})
+
+console.log(session.sessionId) // 0x...
+console.log(session.escrow)    // 0x...
+```
+
+This does two things on-chain: approves USDC and calls `SessionFactory.openSession`. The factory deploys an escrow contract and deposits your USDC into Aave V3 — aUSDC starts accruing immediately.
+
+## Sign a voucher
+
+Each time the agent consumes a unit of service, it signs a voucher authorizing the cumulative total so far:
+
+```typescript
+const voucher = await client.signVoucher(
+  {
+    sessionId: session.sessionId,
+    totalAuthorized: parseUnits('0.002', 6), // $0.002 total authorized so far
+    nonce: 1n,
+  },
+  session.escrow
+)
+
+// Send to the service provider off-chain
+await fetch('https://api.yourservice.com/voucher', {
+  method: 'POST',
+  body: JSON.stringify(voucher),
+})
+```
+
+Vouchers are cumulative — each one replaces the last. Only the final voucher is submitted on-chain.
+
+## Close the session
+
+When the agent is done, signal the backend to settle:
+
+```typescript
+await client.closeSession(session.sessionId)
+```
+
+The backend submits the latest voucher on-chain. The escrow withdraws from Aave, pays the service provider, and returns unspent USDC + yield to the agent.
+
+## What happens on settlement
+
+```
+totalWithdrawn = deposit + yield_earned
+recipientAmount = totalAuthorized + (yield * (100 - agentYieldShare) / 100)
+agentAmount     = (deposit - totalAuthorized) + (yield * agentYieldShare / 100)
+```

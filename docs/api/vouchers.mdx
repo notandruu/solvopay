@@ -1,0 +1,73 @@
+---
+title: Vouchers
+description: Submit signed payment authorizations.
+---
+
+## Submit a voucher
+
+```
+POST /sessions/{session_id}/vouchers
+```
+
+Service providers call this endpoint after receiving a signed voucher from the agent. The backend stores it and uses the latest one at settlement.
+
+**Request body:**
+
+```json
+{
+  "total_authorized": "3000",
+  "nonce": 3,
+  "signature": "0x..."
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_authorized` | string | Cumulative USDC authorized, 6-decimal units |
+| `nonce` | integer | Must be greater than the previously stored nonce |
+| `signature` | string | 65-byte EIP-712 ECDSA signature from the agent |
+
+**Response `200`:**
+
+```json
+{
+  "session_id": "0x...",
+  "nonce": 3,
+  "total_authorized": "3000",
+  "submitted_at": "2024-04-01T00:05:00Z"
+}
+```
+
+**Response `400` — stale nonce:**
+
+```json
+{ "detail": "nonce 3 is not greater than current highest nonce 3" }
+```
+
+**Response `400` — exceeds deposit:**
+
+```json
+{ "detail": "total_authorized exceeds deposit" }
+```
+
+## Voucher validation
+
+The backend performs basic validation before storing:
+- `nonce` must be strictly greater than the previous highest nonce
+- `total_authorized` must not exceed `deposit`
+
+The backend does **not** verify the EIP-712 signature — that verification happens on-chain at settlement. If a provider submits a forged voucher, the on-chain `ECDSA.recover` check will fail and the settlement transaction will revert.
+
+## Only the latest voucher is used
+
+The backend stores all submitted vouchers but only uses the one with the highest nonce when settling. Intermediate vouchers are never submitted on-chain. This matches the contract's nonce enforcement — only the final state matters.
+
+## Provider self-settlement
+
+Service providers can bypass the backend entirely and submit the final voucher directly on-chain:
+
+```solidity
+SessionEscrow(escrowAddress).settle(voucher, signature)
+```
+
+The provider holds the signed voucher received off-chain. They call `settle` directly with it. The contract verifies the signature, nonce, and amount — same as the backend flow.

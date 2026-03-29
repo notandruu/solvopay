@@ -1,0 +1,44 @@
+---
+title: Introduction
+description: On-chain payment sessions for AI agents.
+---
+
+SolvoPay is a payment session protocol for autonomous agents built on Base. It lets an AI agent deposit USDC once, authorize payments off-chain through signed vouchers, and settle everything on-chain in a single transaction — while the locked funds earn Aave V3 yield the entire time.
+
+## The problem
+
+AI agents need to pay for things: API calls, compute, tool invocations, data fetches. Existing payment rails don't fit:
+
+- **Cards** require human authorization and fail at machine speed
+- **Per-action on-chain transactions** cost gas and add latency on every step
+- **Subscriptions** don't map to per-task workloads with variable cost
+
+## The solution
+
+SolvoPay implements a state channel between an agent and a service provider:
+
+1. The agent locks USDC into an escrow contract at session start
+2. Every action produces a signed voucher off-chain — no gas, no block wait
+3. The service provider submits the final voucher on-chain once to settle
+
+Locked funds accrue Aave V3 yield during the session. At settlement, yield splits between the agent and the provider according to the session's configured ratio.
+
+## Architecture
+
+```
+agent-pay/
+  contracts/    SessionFactory, SessionEscrow, VoucherLib (Base mainnet)
+  sdk/          TypeScript client — open sessions, sign vouchers, settle
+  backend/      FastAPI — session state, Alchemy webhooks, on-chain poller
+  frontend/     Next.js dashboard — live yield, session management
+```
+
+## Network
+
+SolvoPay runs on **Base mainnet**.
+
+| Contract | Address |
+|----------|---------|
+| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Aave V3 Pool | `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5` |
+| aUSDC | `0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB` |

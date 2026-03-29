@@ -1,0 +1,63 @@
+---
+title: closeSession
+description: Signal the backend to settle and distribute funds.
+---
+
+## Signature
+
+```typescript
+client.closeSession(sessionId: `0x${string}`): Promise<void>
+```
+
+## What it does
+
+`closeSession` sends a `POST /sessions/{id}/settle` request to the backend. The backend:
+
+1. Fetches the latest voucher it has on record for this session
+2. Calls `SessionEscrow.settle(voucher, signature)` on-chain
+3. The escrow verifies the signature, withdraws aUSDC from Aave, and distributes USDC
+
+This requires `backendUrl` to be set in the client config. If no backend is configured, `closeSession` throws.
+
+## Example
+
+```typescript
+await client.closeSession(session.sessionId)
+```
+
+## Settlement math
+
+```
+totalWithdrawn  = deposit + yield_earned
+providerAmount  = totalAuthorized + (yield × (100 − agentYieldShare) / 100)
+agentAmount     = (deposit − totalAuthorized) + (yield × agentYieldShare / 100)
+```
+
+## Self-settlement (no backend)
+
+Service providers can settle directly without the backend:
+
+```typescript
+// Provider-side — they hold the final SignedVoucher
+await providerClient.settle(escrowAddress, signedVoucher)
+```
+
+This calls `SessionEscrow.settle` directly with the signed voucher the provider received off-chain.
+
+## Refund path
+
+If the session deadline has passed and no settlement occurred, the agent can reclaim all funds after 7 days:
+
+```typescript
+await client.refund(session.escrow)
+```
+
+This calls `SessionEscrow.refund()` directly — no backend required. The agent receives the full deposit plus all accrued yield.
+
+## Session states
+
+| State | Description |
+|-------|-------------|
+| `ACTIVE` | Session is open, vouchers can be signed |
+| `SETTLED` | `settle()` was called successfully |
+| `REFUNDED` | `refund()` was called after deadline + 7 days |

@@ -1,0 +1,75 @@
+---
+title: Webhooks
+description: Alchemy event webhooks for real-time session state sync.
+---
+
+## Endpoint
+
+```
+POST /webhooks/alchemy
+```
+
+Alchemy calls this endpoint when contract events are emitted. The backend uses it to keep session state in sync without polling.
+
+## Signature verification
+
+Every request from Alchemy includes an `X-Alchemy-Signature` header. The backend verifies it before processing:
+
+```python
+import hmac, hashlib
+
+expected = hmac.new(
+    signing_key.encode(),
+    request.body,
+    hashlib.sha256
+).hexdigest()
+
+if not hmac.compare_digest(expected, x_alchemy_signature):
+    raise HTTPException(status_code=401)
+```
+
+Set `ALCHEMY_WEBHOOK_SIGNING_KEY` in your backend environment variables to the key Alchemy provides when you create the webhook.
+
+## Handled events
+
+### SessionOpened
+
+Emitted by `SessionFactory` when a new session is created.
+
+```
+topic: keccak256("SessionOpened(bytes32,address,address,address,uint256)")
+```
+
+The backend extracts `sessionId`, `escrow`, `agent`, `recipient`, and `deposit` from the log data and creates a session record.
+
+### Settled
+
+Emitted by `SessionEscrow` on successful settlement.
+
+```
+topic: keccak256("Settled(uint256,uint256,uint256)")
+```
+
+The backend marks the session `SETTLED` and records `recipientAmount`, `agentRefund`, and `yieldEarned`.
+
+### Refunded
+
+Emitted by `SessionEscrow` when the agent claims a refund.
+
+```
+topic: keccak256("Refunded(uint256)")
+```
+
+The backend marks the session `REFUNDED`.
+
+## Configuring in Alchemy
+
+1. Go to Alchemy Dashboard → Webhooks → Create Webhook
+2. Select **Address Activity** or **Custom Webhook**
+3. Set the URL to `https://your-backend.railway.app/webhooks/alchemy`
+4. Add the `SessionFactory` address and any deployed `SessionEscrow` addresses
+5. Copy the signing key to `ALCHEMY_WEBHOOK_SIGNING_KEY`
+
+## Fallback: on-chain poller
+
+If the webhook misses an event (network hiccup, cold start), the backend runs a 60-second APScheduler job that scans the last 20 blocks for `SessionOpened` events from the factory. Any sessions not yet in the database are synced automatically.

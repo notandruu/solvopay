@@ -1,0 +1,53 @@
+---
+title: Installation
+description: Add the SolvoPay SDK to your project.
+---
+
+## Requirements
+
+- Node.js 18+
+- A Base-compatible private key (EOA)
+- An Alchemy or other Base RPC endpoint
+
+## Install
+
+```bash
+npm install @solvopay/sdk viem
+```
+
+`viem` is a peer dependency. The SDK uses it for on-chain reads/writes and EIP-712 signing.
+
+## Environment variables
+
+```bash
+BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
+AGENT_PRIVATE_KEY=0x...
+FACTORY_ADDRESS=0x...
+```
+
+## Initialize
+
+```typescript
+import { SolvoPayClient } from '@solvopay/sdk'
+
+const client = new SolvoPayClient({
+  rpcUrl: process.env.BASE_RPC_URL,
+  agentPrivateKey: process.env.AGENT_PRIVATE_KEY,
+  factoryAddress: process.env.FACTORY_ADDRESS,
+})
+```
+
+The client creates a viem `WalletClient` (signer) and `PublicClient` (reads) from these values. No network calls are made at construction time.
+
+## Optional: backend URL
+
+```typescript
+const client = new SolvoPayClient({
+  rpcUrl: process.env.BASE_RPC_URL,
+  agentPrivateKey: process.env.AGENT_PRIVATE_KEY,
+  factoryAddress: process.env.FACTORY_ADDRESS,
+  backendUrl: 'https://your-backend.railway.app',
+})
+```
+
+When `backendUrl` is set, `closeSession` and `getSession` route through your backend instead of reading directly from chain. This is required for settlement — the backend holds the latest submitted voucher and submits it on-chain.

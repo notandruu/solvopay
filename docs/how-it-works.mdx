@@ -1,0 +1,74 @@
+---
+title: How It Works
+description: The session lifecycle and the voucher primitive.
+---
+
+## Session lifecycle
+
+```
+1. Agent opens a session
+   └── Deposits USDC → SessionFactory
+   └── Factory deploys SessionEscrow
+   └── Factory supplies USDC to Aave V3 on behalf of escrow
+   └── Escrow holds aUSDC — balance grows every block
+
+2. Agent performs actions
+   └── Signs a voucher off-chain: { sessionId, totalAuthorized, nonce }
+   └── Sends voucher to service provider
+   └── Provider verifies signature, delivers service
+   └── No gas. No block wait. No chain interaction.
+
+3. Session ends
+   └── Provider (or backend) submits final voucher on-chain
+   └── Escrow verifies: sig valid, totalAuthorized ≤ deposit, nonce is latest
+   └── Escrow withdraws all aUSDC from Aave → USDC
+   └── Distributes: provider gets authorized amount + yield share
+   └── Agent gets: unspent deposit + yield share
+```
+
+## The voucher primitive
+
+A voucher is a [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data signature with three fields:
+
+```solidity
+struct Voucher {
+    bytes32 sessionId;
+    uint256 totalAuthorized;  // cumulative total authorized so far
+    uint256 nonce;            // must increase monotonically
+}
+```
+
+`totalAuthorized` is cumulative — not per-action. If the agent has consumed $0.001, $0.002, and $0.003 worth of service, the vouchers are `0.001`, `0.002`, `0.003`. The contract only enforces that the submitted nonce is greater than any previously seen nonce.
+
+This means the service provider can never extract more than the agent's last signed amount, because that amount is verified on-chain at settlement.
+
+## Yield during sessions
+
+Deposited USDC is supplied to Aave V3 immediately on session open. aUSDC rebases every block — `aUsdc.balanceOf(escrow)` grows automatically with no action required.
+
+At settlement:
+
+```
+yield = totalWithdrawn - deposit
+agentYield     = yield × agentYieldShare / 100
+recipientYield = yield × (100 - agentYieldShare) / 100
+```
+
+## Self-recovery paths
+
+The backend is not a single point of failure:
+
+- **Agent refund**: if the session deadline passes and no settlement occurs for 7 days, the agent can call `SessionEscrow.refund()` directly to recover all funds + yield
+- **Provider self-settle**: the service provider can submit the final voucher directly on-chain without the backend
+- **Aave reserve pause**: if Aave's `withdraw()` reverts, the session stays `ACTIVE` and retries on the next poll cycle
+
+## EIP-712 domain
+
+```
+name:              "SolvoPay"
+version:           "1"
+chainId:           8453
+verifyingContract: <escrow address>
+```
+
+Each escrow is its own verifying contract, so vouchers for one session cannot be replayed on another.
