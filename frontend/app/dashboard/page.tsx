@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
@@ -31,8 +32,9 @@ export default function DashboardPage() {
       <header className="fixed top-0 left-0 right-0 z-40 p-4">
         <nav className="max-w-5xl mx-auto flex items-center justify-between h-12 px-6 rounded-full bg-zinc-900/70 border border-zinc-800/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
-            <Link href="/" className="font-display text-lg font-semibold text-zinc-100">
-              SolvoPay
+            <Link href="/" className="flex items-center gap-2">
+              <Image src="/logo.png" alt="SolvoPay" width={28} height={28} className="rounded-md" />
+              <span className="font-display text-lg font-semibold text-zinc-100">SolvoPay</span>
             </Link>
             <span className="text-zinc-700 text-sm">/</span>
             <span className="text-sm text-zinc-500">Dashboard</span>
