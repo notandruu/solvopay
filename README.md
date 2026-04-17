@@ -4,6 +4,8 @@ AI agents can't use credit cards. SolvoPay gives them a payment rail that works 
 
 > Lock funds. Stream vouchers. Settle on-chain. Earn yield while you wait.
 
+**Frontend:** [solvopay.xyz](https://solvopay.xyz) — live on Base Sepolia
+
 ---
 
 ## What is this
@@ -256,14 +258,20 @@ npm install && npm run build
 
 ## Deployment checklist
 
-- [ ] Enable Base Mainnet in Alchemy app
+- [ ] Enable Base Mainnet in Alchemy app ([dashboard.alchemy.com/apps/aea5cky461zasvvb/networks](https://dashboard.alchemy.com/apps/aea5cky461zasvvb/networks))
 - [ ] Deploy `SessionFactory` to Base mainnet: `npx hardhat run scripts/deploy.ts --network base`
-- [ ] Set `NEXT_PUBLIC_FACTORY_ADDRESS` in Vercel with mainnet address
-- [ ] Set `NEXT_PUBLIC_USDC_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` in Vercel
-- [ ] Set `SESSION_FACTORY_ADDRESS` in Railway backend
-- [ ] Register Alchemy `ADDRESS_ACTIVITY` webhook for the factory address
-- [ ] Set `ALCHEMY_WEBHOOK_SIGNING_KEY` in Railway
-- [ ] Get WalletConnect project ID and set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+- [ ] Update `NEXT_PUBLIC_FACTORY_ADDRESS` in Vercel with mainnet address
+- [ ] Update `NEXT_PUBLIC_USDC_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` in Vercel
+- [x] Set `NEXT_PUBLIC_FACTORY_ADDRESS=0x5E6bb045A958B7613A79F2E9DC0918519F25290c` (Sepolia) in Vercel ✓
+- [x] Set `NEXT_PUBLIC_USDC_ADDRESS=0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f` (Sepolia) in Vercel ✓
+- [x] Frontend deployed to [solvopay.xyz](https://solvopay.xyz) ✓
+- [ ] Deploy backend to Railway: `railway login && railway init && railway up` (from `backend/`)
+- [ ] Add Postgres plugin in Railway dashboard
+- [ ] Set Railway env vars: `DATABASE_URL` (auto), `ALCHEMY_BASE_MAINNET_RPC`, `BACKEND_EOA_PRIVATE_KEY`, `SESSION_FACTORY_ADDRESS`, `ALCHEMY_WEBHOOK_SIGNING_KEY`
+- [ ] Set `NEXT_PUBLIC_BACKEND_URL` in Vercel once Railway URL is known
+- [ ] Register Alchemy `ADDRESS_ACTIVITY` webhook → `https://YOUR_RAILWAY_URL/webhooks/alchemy`
+- [ ] Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` in Vercel ([cloud.walletconnect.com](https://cloud.walletconnect.com))
+- [ ] Publish SDK: `npm login && npm publish --access public` (from `sdk/`)
 
 ---
 
