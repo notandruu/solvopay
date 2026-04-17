@@ -5,8 +5,12 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "viem": "^2.21.0"
   },

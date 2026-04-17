@@ -3,8 +3,8 @@ import type { Address } from "viem";
 export const FACTORY_ADDRESS =
   (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as Address) ?? "0x0000000000000000000000000000000000000000";
 
-export const AUSDC_ADDRESS: Address = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
-export const USDC_ADDRESS: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const USDC_ADDRESS: Address =
+  (process.env.NEXT_PUBLIC_USDC_ADDRESS as Address) ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export const SESSION_FACTORY_ABI = [
   {
@@ -110,6 +110,13 @@ export const SESSION_ESCROW_ABI = [
     name: "deadlineAt",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "aUsdc",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
   },
   {

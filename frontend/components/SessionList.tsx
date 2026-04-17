@@ -3,7 +3,7 @@
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import type { Address } from "viem";
-import { AUSDC_ADDRESS, ERC20_ABI, SESSION_ESCROW_ABI } from "@/lib/contracts";
+import { ERC20_ABI, SESSION_ESCROW_ABI } from "@/lib/contracts";
 
 const STATUS_LABELS = ["Active", "Settled", "Refunded"] as const;
 const STATUS_STYLES = [
@@ -31,12 +31,18 @@ function SessionCard({ sessionId, escrowAddress }: SessionCardProps) {
     functionName: "deposit",
   });
 
+  const { data: aUsdc } = useReadContract({
+    address: escrowAddress,
+    abi: SESSION_ESCROW_ABI,
+    functionName: "aUsdc",
+  });
+
   const { data: aTokenBalance } = useReadContract({
-    address: AUSDC_ADDRESS,
+    address: aUsdc as Address | undefined,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [escrowAddress],
-    query: { refetchInterval: 4000 },
+    query: { refetchInterval: 4000, enabled: !!aUsdc },
   });
 
   const statusIndex = status !== undefined ? Number(status) : 0;
