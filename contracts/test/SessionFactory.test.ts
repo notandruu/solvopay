@@ -1,42 +1,40 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { SessionFactory, SessionEscrow } from "../typechain-types";
+import { SessionFactory, MockERC20, MockAavePool } from "../typechain-types";
 
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const AAVE_POOL = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-const AUSDC = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
-
-const USDC_WHALE = "0x3304E22DDaa22bCdC5fCa2269b418046aE7b566A";
 const DEPOSIT = ethers.parseUnits("10", 6);
 const ONE_DAY = 86400n;
-
-async function impersonate(address: string): Promise<HardhatEthersSigner> {
-  await ethers.provider.send("hardhat_impersonateAccount", [address]);
-  await ethers.provider.send("hardhat_setBalance", [address, "0x56BC75E2D63100000"]);
-  return ethers.getSigner(address);
-}
 
 describe("SessionFactory", function () {
   let factory: SessionFactory;
   let agent: HardhatEthersSigner;
   let recipient: HardhatEthersSigner;
-  let whale: HardhatEthersSigner;
-  let usdc: any;
-  let aUsdc: any;
+  let usdc: MockERC20;
+  let aUsdc: MockERC20;
+  let pool: MockAavePool;
   let deadlineAt: bigint;
 
   beforeEach(async function () {
     [agent, recipient] = await ethers.getSigners();
-    whale = await impersonate(USDC_WHALE);
 
-    usdc = await ethers.getContractAt("IERC20", USDC);
-    aUsdc = await ethers.getContractAt("IERC20", AUSDC);
+    const ERC20 = await ethers.getContractFactory("MockERC20");
+    usdc = await ERC20.deploy("USD Coin", "USDC", 6) as MockERC20;
+    aUsdc = await ERC20.deploy("Aave USDC", "aUSDC", 6) as MockERC20;
 
-    await usdc.connect(whale).transfer(agent.address, DEPOSIT * 3n);
+    const Pool = await ethers.getContractFactory("MockAavePool");
+    pool = await Pool.deploy(await usdc.getAddress(), await aUsdc.getAddress()) as MockAavePool;
+
+    await aUsdc.mint(await pool.getAddress(), 0);
 
     const Factory = await ethers.getContractFactory("SessionFactory");
-    factory = await Factory.deploy(AAVE_POOL, USDC, AUSDC);
+    factory = await Factory.deploy(
+      await pool.getAddress(),
+      await usdc.getAddress(),
+      await aUsdc.getAddress()
+    ) as SessionFactory;
+
+    await usdc.mint(agent.address, DEPOSIT * 3n);
 
     const block = await ethers.provider.getBlock("latest");
     deadlineAt = BigInt(block!.timestamp) + ONE_DAY;
@@ -93,5 +91,12 @@ describe("SessionFactory", function () {
     await expect(
       factory.connect(agent).openSession(recipient.address, DEPOSIT, 101, deadlineAt)
     ).to.be.revertedWith("yield share > 100");
+  });
+
+  it("reverts on zero recipient", async function () {
+    await usdc.connect(agent).approve(await factory.getAddress(), DEPOSIT);
+    await expect(
+      factory.connect(agent).openSession(ethers.ZeroAddress, DEPOSIT, 80, deadlineAt)
+    ).to.be.revertedWith("zero recipient");
   });
 });

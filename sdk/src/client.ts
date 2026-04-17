@@ -1,9 +1,11 @@
 import {
   createWalletClient,
   createPublicClient,
+  defineChain,
   http,
   parseEventLogs,
   type Address,
+  type Chain,
   type Hash,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -12,7 +14,6 @@ import {
   SESSION_FACTORY_ABI,
   SESSION_ESCROW_ABI,
   ERC20_ABI,
-  BASE_MAINNET_ADDRESSES,
 } from "./constants";
 import { VoucherSigner } from "./signer";
 import type {
@@ -23,18 +24,30 @@ import type {
   SignedVoucher,
 } from "./types";
 
+function resolveChain(config: SolvoPayConfig): Chain {
+  if (!config.chainId || config.chainId === base.id) return base;
+  return defineChain({
+    id: config.chainId,
+    name: `Chain ${config.chainId}`,
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [config.rpcUrl] } },
+  });
+}
+
 export class SolvoPayClient {
   private readonly walletClient: any;
   private readonly publicClient: any;
   private readonly factoryAddress: Address;
+  private readonly chain: Chain;
   private readonly backendUrl: string | undefined;
 
   constructor(config: SolvoPayConfig) {
+    this.chain = resolveChain(config);
     const account = privateKeyToAccount(config.agentPrivateKey);
     const transport = http(config.rpcUrl);
 
-    this.walletClient = createWalletClient({ account, chain: base, transport });
-    this.publicClient = createPublicClient({ chain: base, transport });
+    this.walletClient = createWalletClient({ account, chain: this.chain, transport });
+    this.publicClient = createPublicClient({ chain: this.chain, transport });
     this.factoryAddress = config.factoryAddress;
     this.backendUrl = config.backendUrl;
   }
@@ -53,10 +66,16 @@ export class SolvoPayClient {
 
     const account = this.walletClient.account!;
 
+    const usdc = await this.publicClient.readContract({
+      address: this.factoryAddress,
+      abi: SESSION_FACTORY_ABI,
+      functionName: "usdc",
+    }) as Address;
+
     const approveTx = await this.walletClient.writeContract({
       account,
-      chain: base,
-      address: BASE_MAINNET_ADDRESSES.usdc,
+      chain: this.chain,
+      address: usdc,
       abi: ERC20_ABI,
       functionName: "approve",
       args: [this.factoryAddress, depositAmount],
@@ -65,7 +84,7 @@ export class SolvoPayClient {
 
     const openTx = await this.walletClient.writeContract({
       account,
-      chain: base,
+      chain: this.chain,
       address: this.factoryAddress,
       abi: SESSION_FACTORY_ABI,
       functionName: "openSession",
@@ -115,7 +134,7 @@ export class SolvoPayClient {
   }
 
   async signVoucher(params: SignVoucherParams, escrowAddress: Address): Promise<SignedVoucher> {
-    const signer = new VoucherSigner(this.walletClient as any, escrowAddress, base.id);
+    const signer = new VoucherSigner(this.walletClient as any, escrowAddress, this.chain.id);
     return signer.sign(params);
   }
 
@@ -137,8 +156,14 @@ export class SolvoPayClient {
   }
 
   async getATokenBalance(escrowAddress: Address): Promise<bigint> {
+    const aUsdc = await this.publicClient.readContract({
+      address: escrowAddress,
+      abi: SESSION_ESCROW_ABI,
+      functionName: "aUsdc",
+    }) as Address;
+
     return this.publicClient.readContract({
-      address: BASE_MAINNET_ADDRESSES.aUsdc,
+      address: aUsdc,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [escrowAddress],

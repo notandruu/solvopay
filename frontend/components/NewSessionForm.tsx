@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, usePublicClient } from "wagmi";
 import { parseUnits, parseEventLogs } from "viem";
 import type { Address } from "viem";
 import {
@@ -29,10 +29,11 @@ export function NewSessionForm({ onSessionOpened }: NewSessionFormProps) {
   const [step, setStep] = useState<"idle" | "approving" | "opening" | "done">("idle");
 
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address) return;
+    if (!address || !publicClient) return;
 
     try {
       const amount = parseUnits(depositAmount, 6);
@@ -54,17 +55,14 @@ export function NewSessionForm({ onSessionOpened }: NewSessionFormProps) {
         args: [recipient as Address, amount, BigInt(yieldShare), deadline],
       });
 
-      const receipt = await fetch(`/api/tx?hash=${openTx}`).then((r) => r.json());
-
-      if (receipt?.logs) {
-        const logs = parseEventLogs({
-          abi: SESSION_FACTORY_ABI,
-          eventName: "SessionOpened",
-          logs: receipt.logs,
-        });
-        if (logs[0]) {
-          onSessionOpened(logs[0].args.sessionId as string, logs[0].args.escrow as Address);
-        }
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: openTx });
+      const logs = parseEventLogs({
+        abi: SESSION_FACTORY_ABI,
+        eventName: "SessionOpened",
+        logs: receipt.logs,
+      });
+      if (logs[0]) {
+        onSessionOpened(logs[0].args.sessionId as string, logs[0].args.escrow as Address);
       }
 
       setStep("done");

@@ -16,13 +16,7 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {
-      forking: {
-        url: process.env.ALCHEMY_BASE_MAINNET_RPC ?? "",
-        enabled: !!process.env.ALCHEMY_BASE_MAINNET_RPC,
-      },
-      chainId: 8453,
-    },
+    hardhat: {},
     base: {
       url: process.env.ALCHEMY_BASE_MAINNET_RPC ?? "",
       chainId: 8453,

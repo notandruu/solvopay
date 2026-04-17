@@ -1,5 +1,4 @@
 from web3 import AsyncWeb3
-from web3.middleware import ExtraDataToPOAMiddleware
 from app.config import settings
 
 SESSION_FACTORY_ABI = [
@@ -75,10 +74,14 @@ SESSION_ESCROW_ABI = [
     },
 ]
 
+_w3: AsyncWeb3 | None = None
+
 
 def get_web3() -> AsyncWeb3:
-    w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(settings.alchemy_base_mainnet_rpc))
-    return w3
+    global _w3
+    if _w3 is None:
+        _w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(settings.alchemy_base_mainnet_rpc))
+    return _w3
 
 
 async def submit_settle(
@@ -97,14 +100,20 @@ async def submit_settle(
 
     session_id_bytes = bytes.fromhex(session_id.removeprefix("0x"))
     sig_bytes = bytes.fromhex(sig.removeprefix("0x"))
-
     voucher = (session_id_bytes, total_authorized, nonce)
 
-    nonce_val = await w3.eth.get_transaction_count(account.address)
+    tx_nonce = await w3.eth.get_transaction_count(account.address)
+    fee_data = await w3.eth.fee_history(1, "latest", [50])
+    base_fee = fee_data["baseFeePerGas"][-1]
+    priority_fee = AsyncWeb3.to_wei(0.001, "gwei")
+    max_fee = base_fee * 2 + priority_fee
+
     tx = await contract.functions.settle(voucher, sig_bytes).build_transaction(
         {
             "from": account.address,
-            "nonce": nonce_val,
+            "nonce": tx_nonce,
+            "maxFeePerGas": max_fee,
+            "maxPriorityFeePerGas": priority_fee,
         }
     )
     signed = account.sign_transaction(tx)

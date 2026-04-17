@@ -39,6 +39,13 @@ export const SESSION_FACTORY_ABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "usdc",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
     type: "event",
     name: "SessionOpened",
     inputs: [
@@ -133,6 +140,13 @@ export const SESSION_ESCROW_ABI = [
     name: "highestNonce",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "aUsdc",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
   },
   {

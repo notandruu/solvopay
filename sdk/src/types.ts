@@ -4,6 +4,7 @@ export interface SolvoPayConfig {
   rpcUrl: string;
   agentPrivateKey: Hex;
   factoryAddress: Address;
+  chainId?: number;
   backendUrl?: string;
 }
 
