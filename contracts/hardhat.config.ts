@@ -30,6 +30,13 @@ const config: HardhatUserConfig = {
         ? [process.env.DEPLOYER_PRIVATE_KEY]
         : [],
     },
+    "base-sepolia": {
+      url: process.env.ALCHEMY_BASE_SEPOLIA_RPC ?? "",
+      chainId: 84532,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY
+        ? [process.env.DEPLOYER_PRIVATE_KEY]
+        : [],
+    },
   },
 };
 
